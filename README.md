@@ -1,33 +1,36 @@
-# Image Captioning with Attention Mechanism
+# 🛍️ Ecommerce Product Descriptions with Attention Mechanism
 
-This repository contains the implementation of an image captioning system that generates descriptive captions for images using an encoder-decoder architecture with an attention mechanism. The model is built with PyTorch and trained on the Flickr8k dataset.
+This repository contains the implementation of an image captioning system that generates product descriptions from catalog images using an encoder-decoder architecture with an attention mechanism. The model is built with PyTorch and trained on a structured ecommerce dataset.
 
 ---
 
 ## Features
 
-- **CNN Encoder**: Utilizes a pre-trained ResNet50 model to extract spatial features from images.
-- **RNN Decoder**: LSTM-based decoder generates captions word-by-word.
-- **Attention Mechanism**: Ensures the model focuses on relevant image regions during caption generation.
-- **Training Metrics**: Tracks validation loss and BLEU scores to monitor performance.
-- **Preprocessing Pipelines**: Includes image transformations and caption tokenization.
+- **CNN Encoder**: Uses a pre-trained ResNet50 to extract spatial image features.
+- **RNN Decoder**: LSTM-based decoder generates captions token-by-token.
+- **Visual Attention**: Focuses the model on relevant image regions during caption generation.
+- **Evaluation Metrics**: Tracks validation loss and BLEU scores to monitor learning progress.
+- **Preprocessing Pipelines**: Includes image transformations, vocabulary construction, and caption encoding.
 
 ---
 
 ## Dataset
 
-**Flickr8k Dataset**
+**Fashion Product Images (Small)**
 
-- **Description**: Contains 8,000 images, each paired with five textual captions.
+- **Description**: Product images paired with structured product titles/descriptions.
+- **Examples**:
+  - Input Image: Fashion product photo  
+  - Target Caption: `"Peter England Men Striped Green Shirt"`
 - **Splits**:
-  - Training: 30,000 samples
-  - Validation: 5,000 samples
-  - Testing: 5,455 samples
+  - Training: 80%
+  - Validation: 10%
+  - Testing: 10%
 
 To download the dataset, this project leverages the KaggleHub library:
 
 ```bash
-kagglehub.dataset_download('adityajn105/flickr8k')
+kagglehub.dataset_download('paramaggarwal/fashion-product-images-small')
 ```
 
 ---
@@ -49,42 +52,44 @@ kagglehub.dataset_download('adityajn105/flickr8k')
 ## Model Architecture
 
 ### Encoder
-- Pre-trained ResNet50 with frozen weights.
-- Extracts spatial features from input images.
+- Pre-trained **ResNet50**, last layers removed, weights frozen (optional).
+- Outputs spatial feature maps used for attention.
+
+### Attention
+- MLP-based soft attention (Bahdanau-style) between encoder features and decoder hidden state.
 
 ### Decoder
 - Embedding layer (size: 300)
 - LSTM with hidden size 512
-- Attention mechanism for focusing on salient image regions.
-
-### Training Details
-- Loss Function: CrossEntropyLoss (ignores `<PAD>` tokens)
-- Optimizer: Adam (learning rate = 3e-4)
-- Batch Size: 32
-- Epochs: 15
+- Linear layers for attention projection and vocabulary prediction
 
 ---
 
 ## Preprocessing
 
-### Image Transformations
-- Resizing to 224x224
-- Normalization with ImageNet mean and standard deviation
+### Images
+- Resize to `224x224`
+- Normalize with ImageNet mean and std
 
-### Caption Processing
-- Tokenization using `spacy`
-- Vocabulary construction with frequency filtering
-- Padding and special tokens (`<SOS>`, `<EOS>`, `<PAD>`, `<UNK>`)
+### Captions
+- Tokenized using spaCy
+- Vocabulary built using frequency thresholding (e.g., ignore words appearing < 5 times)
+- Special tokens: `<SOS>`, `<EOS>`, `<PAD>`, `<UNK>`
 
 ---
 
-## Training the Model
+## Training Details
 
-Progress is tracked using a tqdm progress bar, and checkpoints are saved after each epoch:
+- **Loss**: CrossEntropyLoss (ignores `<PAD>`)
+- **Optimizer**: Adam (lr = `3e-4`)
+- **Batch Size**: 32
+- **Epochs**: 15
+- **Evaluation**: BLEU score (with smoothing)
 
+Checkpoints saved after each epoch with:
 - Model weights
-- Optimizer states
-- Training/validation losses
+- Optimizer state
+- Training/Validation loss logs
 
 ---
 
@@ -92,40 +97,44 @@ Progress is tracked using a tqdm progress bar, and checkpoints are saved after e
 
 - **Metrics**:
   - Validation Loss
-  - BLEU Score
+  - BLEU-1 to BLEU-4 scores
 
-- **Testing**:
+- **Inference**:
   - Generates captions for test images
-  - Computes BLEU scores to evaluate performance
+  - Captions auto-stop at `<EOS>`
+  - `<PAD>`, `<SOS>`, `<UNK>`, `<EOS>` are excluded from evaluation
 
 ---
 
 ## Limitations
 
-- The model's performance is limited by the size and diversity of the Flickr8k dataset.
-- Generated captions may not always be fluent or accurate for complex images.
+- May overfit frequent tokens (like “men”, “shirt”) if dataset is imbalanced.
+- `<UNK>` predictions still occur if vocab coverage is low.
+- BLEU score may be low despite useful outputs due to phrasing mismatch.
 
 ---
 
 ## Future Work
 
-- Use larger datasets like MSCOCO for improved training.
-- Fine-tune encoder weights for better feature extraction.
-- Explore transformer-based decoders for enhanced caption generation.
-
----
-
-## License
-
-This project is licensed under the MIT License. See the LICENSE file for details.
+- Fine-tune the encoder on fashion/product datasets
+- Add beam search for better caption diversity
+- Train on larger datasets (e.g. Flipkart, DeepFashion)
+- Replace LSTM with Transformer decoder
+- Add attribute-conditioning (e.g., color, category, brand embeddings)
 
 ---
 
 ## Acknowledgments
 
-- [Flickr8k Dataset](https://www.kaggle.com/adityajn105/flickr8k)
+- [Fashion Product Images (Small) Dataset](https://www.kaggle.com/datasets/paramaggarwal/fashion-product-images-small)
 - PyTorch and its amazing community
 - KaggleHub library for seamless dataset integration
+
+---
+
+## License
+
+MIT License – see `LICENSE` file for details.
 
 ---
 
