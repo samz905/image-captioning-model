@@ -69,13 +69,17 @@ class DecoderRNN(nn.Module):
 
         self.init_h = nn.Linear(encoder_dim, decoder_dim)
         self.init_c = nn.Linear(encoder_dim, decoder_dim)
+        
+        nn.init.xavier_uniform_(self.init_h.weight)
+        nn.init.xavier_uniform_(self.init_c.weight)
         self.lstm_cell = nn.LSTMCell(embed_size + encoder_dim, decoder_dim, bias=True)
         self.f_beta = nn.Linear(decoder_dim, encoder_dim)
 
         self.fcn = nn.Linear(decoder_dim, vocab_size)
         self.drop = nn.Dropout(drop_prob)
 
-    def forward(self, features, captions):
+    def forward(self, features, captions, teacher_forcing_ratio=1.0):
+        import random
 
         # vectorize the caption
         embeds = self.embedding(captions)
@@ -91,15 +95,23 @@ class DecoderRNN(nn.Module):
         preds = torch.zeros(batch_size, seq_length, self.vocab_size).to(device)
         alphas = torch.zeros(batch_size, seq_length, num_features).to(device)
 
+        input_word = embeds[:, 0]
+
         for s in range(seq_length):
             alpha, context = self.attention(features, h)
-            lstm_input = torch.cat((embeds[:, s], context), dim=1)
+            lstm_input = torch.cat((input_word, context), dim=1)
             h, c = self.lstm_cell(lstm_input, (h, c))
 
             output = self.fcn(self.drop(h))
-
             preds[:, s] = output
             alphas[:, s] = alpha
+
+            use_teacher_forcing = random.random() < teacher_forcing_ratio
+            if use_teacher_forcing and s < seq_length - 1:
+                input_word = embeds[:, s + 1]
+            else:
+                predicted_word_idx = output.argmax(dim=1)
+                input_word = self.embedding(predicted_word_idx)
 
         return preds, alphas
 
@@ -145,6 +157,48 @@ class DecoderRNN(nn.Module):
         # covert the vocab idx to words and return sentence
         return [vocab.itos[idx] for idx in captions], alphas
 
+    def generate_caption_beam(self, features, beam_size=3, max_len=20, vocab=None):
+        batch_size = features.size(0)
+        h, c = self.init_hidden_state(features)
+        
+        sequences = [[vocab.stoi["<SOS>"]]]
+        scores = [0.0]
+        
+        for i in range(max_len):
+            all_candidates = []
+            
+            for j, seq in enumerate(sequences):
+                if seq[-1] == vocab.stoi["<EOS>"]:
+                    all_candidates.append((scores[j], seq))
+                    continue
+                    
+                word = torch.tensor([seq[-1]]).view(1, -1).to(device)
+                embeds = self.embedding(word)
+                
+                alpha, context = self.attention(features, h)
+                lstm_input = torch.cat((embeds[:, 0], context), dim=1)
+                h, c = self.lstm_cell(lstm_input, (h, c))
+                output = self.fcn(self.drop(h))
+                output = torch.log_softmax(output, dim=1)
+                
+                top_scores, top_words = output.topk(beam_size)
+                
+                for k in range(beam_size):
+                    word_idx = top_words[0][k].item()
+                    score = scores[j] + top_scores[0][k].item()
+                    candidate = seq + [word_idx]
+                    all_candidates.append((score, candidate))
+            
+            ordered = sorted(all_candidates, key=lambda x: x[0], reverse=True)
+            sequences = [seq for score, seq in ordered[:beam_size]]
+            scores = [score for score, seq in ordered[:beam_size]]
+            
+            if all(seq[-1] == vocab.stoi["<EOS>"] for seq in sequences):
+                break
+        
+        best_sequence = sequences[0]
+        return [vocab.itos[idx] for idx in best_sequence], []
+
     def init_hidden_state(self, encoder_out):
         mean_encoder_out = encoder_out.mean(dim=1)
         h = self.init_h(mean_encoder_out)  # (batch_size, decoder_dim)
@@ -163,7 +217,7 @@ class Model(nn.Module):
             decoder_dim=decoder_dim
         )
         
-    def forward(self, images, captions):
+    def forward(self, images, captions, teacher_forcing_ratio=1.0):
         features = self.encoder(images)
-        outputs = self.decoder(features, captions)
+        outputs = self.decoder(features, captions, teacher_forcing_ratio)
         return outputs

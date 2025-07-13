@@ -8,7 +8,7 @@ from vocabulary import Vocabulary
 
 class FashionProductDataset(Dataset):
     def __init__(self, root_dir, caption_file, transform=None, 
-                 freq_threshold=5):
+                 freq_threshold=2):
         self.root_dir = root_dir
         # Handle CSV parsing errors with proper parameters
         try:

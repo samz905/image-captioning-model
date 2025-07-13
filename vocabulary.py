@@ -5,7 +5,7 @@ class Vocabulary:
     # tokenizer
     spacy_eng = spacy.load("en_core_web_sm")
 
-    def __init__(self, freq_threshold=3):
+    def __init__(self, freq_threshold=2):
         # setting the pre-reserved tokens int to string tokens
         self.itos = {0: "<PAD>", 1: "<SOS>", 2: "<EOS>", 3: "<UNK>"}
 
